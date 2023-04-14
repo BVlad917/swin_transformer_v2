@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 from einops import rearrange
 
 from cyclic_shift import CyclicShift
@@ -26,7 +27,7 @@ class WindowAttention(nn.Module):
         self.window_size = window_size
         self.shifted = shifted
         self.input_dim = input_dim
-        self.scale = head_dim ** -0.5
+        self.tau = nn.Parameter(0.1 * torch.ones(heads))  # tau = scale parameter non-shared between heads
         inner_dim = heads * head_dim
 
         self.attn_drop = nn.Dropout(attn_drop_prob)
@@ -69,10 +70,14 @@ class WindowAttention(nn.Module):
                                          w_h=self.window_size, w_w=self.window_size, heads=self.heads, d=self.head_dim)
         q, k, v = map(reshape_fn, qkv)  # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 HEAD_DIM) each
 
-        # scaled dot product between Q and K
-        dots = torch.einsum("b h w i d, b h w j d -> b h w i j", q,
-                            k)  # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 WINDOW_SIZE^2)
-        dots = dots * self.scale  # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 WINDOW_SIZE^2)
+        # scaled cosine attention between Q and K
+        q = F.normalize(q, p=2, dim=-1)
+        k = F.normalize(k, p=2, dim=-1)
+        dots = torch.einsum("b h w i d, b h w j d -> b h w i j", q, k)
+        # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 WINDOW_SIZE^2)
+        tau = torch.clamp(self.tau, min=0.01)  # tau always >= 0.01
+        tau = rearrange(tau, "h -> 1 h 1 1 1")  # change shape to allow for broadcasting
+        dots = dots * tau  # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 WINDOW_SIZE^2)
 
         # add positional embeddings
         dots = dots + self.pos_embedding[self.relative_indices[:, :, 0], self.relative_indices[:, :, 1]]
