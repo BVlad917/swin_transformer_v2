@@ -1,7 +1,7 @@
 from torch import nn
 
 from mlp import MLP
-from pre_norm import PreNorm
+from post_norm import PostNorm
 from residual import Residual
 from window_attention import WindowAttention
 
@@ -27,11 +27,11 @@ class SwinTransformerBlock(nn.Module):
                                            shifted=shifted,
                                            attn_drop_prob=attn_drop_prob,
                                            proj_drop_prob=proj_drop_prob)
-        self.norm1 = PreNorm(dim=input_dim, fn=window_attention)
+        self.norm1 = PostNorm(dim=input_dim, fn=window_attention)
         self.attention_block = Residual(fn=self.norm1, drop_path_prob=drop_path_prob)
 
         mlp = MLP(dim=input_dim, hidden_dim=mlp_dim, drop_prob=proj_drop_prob)
-        self.norm2 = PreNorm(dim=input_dim, fn=mlp)
+        self.norm2 = PostNorm(dim=input_dim, fn=mlp)
         self.mlp_block = Residual(fn=self.norm2, drop_path_prob=drop_path_prob)
 
     def forward(self, x):
