@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from einops import rearrange
 
 from cyclic_shift import CyclicShift
-from utils import get_relative_distances, create_mask
+from utils import get_log_spaced_relative_distances, create_mask
 
 
 class WindowAttention(nn.Module):
@@ -27,7 +27,7 @@ class WindowAttention(nn.Module):
         self.window_size = window_size
         self.shifted = shifted
         self.input_dim = input_dim
-        self.tau = nn.Parameter(0.1 * torch.ones(heads))  # tau = scale parameter non-shared between heads
+        self.tau = nn.Parameter(0.1 * torch.ones(heads))  # tau = scale parameter, non-shared between heads
         inner_dim = heads * head_dim
 
         self.attn_drop = nn.Dropout(attn_drop_prob)
@@ -36,10 +36,16 @@ class WindowAttention(nn.Module):
 
         self.to_qkv = nn.Linear(input_dim, inner_dim * 3, bias=False)
         self.to_out = nn.Linear(inner_dim, input_dim)
-        self.pos_embedding = nn.Parameter(torch.zeros(2 * window_size - 1, 2 * window_size - 1, heads))
-        # (2 * WINDOW_SIZE - 1, 2 * WINDOW_SIZE - 1, HEADS)
-        self.relative_indices = get_relative_distances(window_size) + window_size - 1
+
+        self.relative_indices = get_log_spaced_relative_distances(window_size)
         # (WINDOW_SIZE ** 2, WINDOW_SIZE ** 2, 2)
+
+        # continuous relative position bias MLP
+        self.cpb_mlp = nn.Sequential(
+            nn.Linear(2, 512, bias=True),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, heads, bias=False)  # bias was set to False here in the original implementation
+        )
 
         if shifted:
             displacement = window_size // 2
@@ -68,9 +74,10 @@ class WindowAttention(nn.Module):
         nw_w = w // self.window_size  # number of windows along the width
 
         # function which maps q, k, v into appropriate representations for dot-product attention
-        reshape_fn = lambda t: rearrange(t, "b (nw_h w_h) (nw_w w_w) (heads d) -> b heads (nw_h nw_w) (w_h w_w) d",
-                                         w_h=self.window_size, w_w=self.window_size, heads=self.heads, d=self.head_dim)
-        q, k, v = map(reshape_fn, qkv)  # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 HEAD_DIM) each
+        q, k, v = map(lambda t: rearrange(t, "b (nw_h w_h) (nw_w w_w) (heads d) -> b heads (nw_h nw_w) (w_h w_w) d",
+                                          w_h=self.window_size, w_w=self.window_size, heads=self.heads,
+                                          d=self.head_dim),
+                      qkv)  # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 HEAD_DIM) each
 
         # scaled cosine attention between Q and K
         q = F.normalize(q, p=2, dim=-1)
@@ -83,10 +90,9 @@ class WindowAttention(nn.Module):
         dots = dots / tau  # (B, HEADS, NUM_WINDOWS^2, WINDOW_SIZE^2, WINDOW_SIZE^2)
 
         # add positional embeddings
-        rel_pos_embeddings = self.pos_embedding[self.relative_indices[:, :, 0], self.relative_indices[:, :, 1]]
-        # (WINDOW_SIZE^2, WINDOW_SIZE^2, HEADS)
+        rel_pos_embeddings = self.cpb_mlp(self.relative_indices)  # (WINDOW_SIZE ** 2, WINDOW_SIZE ** 2, HEADS)
         rel_pos_embeddings = rearrange(rel_pos_embeddings, "i j h -> 1 h 1 i j")
-        # (HEADS, 1, WINDOW_SIZE^2, WINDOW_SIZE^2)
+        # (1, HEADS, 1, WINDOW_SIZE^2, WINDOW_SIZE^2)
         dots = dots + rel_pos_embeddings
         # (B, HEADS, NUM_WINDOWS^2, WINDOW_SIZE^2, WINDOW_SIZE^2)
 

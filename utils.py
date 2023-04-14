@@ -31,8 +31,8 @@ def create_mask(window_size, displacement, up_to_down, left_to_right):
 
 def get_relative_distances(window_size):
     """
-    Create a (WINDOW_SIZE^2, WINDOW_SIZE^2, 2) matrix which holds for each element the relative
-    distance to every other element in a patch of size (WINDOW_SIZE, WINDOW_SIZE).
+    Create a (WINDOW_SIZE^2, WINDOW_SIZE^2, 2) matrix which holds, for each element, the relative
+    distance to every other element in a window of size (WINDOW_SIZE, WINDOW_SIZE).
     Input:
         - window_size: the size of the window patch (either height or width); int
     Output:
@@ -40,10 +40,11 @@ def get_relative_distances(window_size):
     Example:
         - input: 2
         - output: matrix "distances" of shape (4, 4, 2). Element distances[1] would be
-        [[0, -1], [0, 0], [1, -1], [1, 0]] which correspond to the 2D representation:
+        [[0, -1], [0, 0], [1, -1], [1, 0]] which corresponds to the following 2D representation:
 
         [[0, -1]  [0, 0]
          [1, -1]  [1, 0]]
+
          which makes sense since the origin in this case is the upper right corner and the matrix
          is populated with the relative distances from this origin to every other position
     """
@@ -54,3 +55,31 @@ def get_relative_distances(window_size):
     indices = indices.transpose(0, 1)  # (WINDOW_SIZE^2, 2)
     distances = indices[None, :, :] - indices[:, None, :]  # (WINDOW_SIZE^2, WINDOW_SIZE^2, 2)
     return distances
+
+
+def get_log_spaced_relative_distances(window_size):
+    """
+    Create a (WINDOW_SIZE^2, WINDOW_SIZE^2, 2) matrix which holds, for each element, the
+    log-spaced relative distance to every other element in a window of size (WINDOW_SIZE, WINDOW_SIZE).
+    Highly based on the method "get_relative_distances()" and meant to implement the log-spaced coordinates
+    discussed in Swin Transformer V2. In essence, every coordinate returned by the previous method
+    "get_relative_distances()" will be put through the following transformation:
+                                        x = sign(x) * log2(1 + abs(x))
+    Input:
+        - window_size: the size of the window patch (either height or width); int
+    Output:
+        - distances: matrix of shape (WINDOW_SIZE^2, WINDOW_SIZE^2, 2)
+    Example:
+        - input: 2
+        - output: matrix "distances" of shape (4, 4, 2). Element distances[1] would be
+        [[0, -1], [0, 0], [0, 1], [1, -1], [1, 0], [1, 1], [1.585, -1], [1.585, 0], [1.585, 1]]
+        which corresponds to the following 2D representation:
+
+        [[0.,    -1.]  [0.,    0.]  [0.,    1.]
+         [1.,    -1.]  [1.,    0.]  [1.,    1.]
+         [1.585, -1.]  [1.585, 0.]  [1.585, 1.]]
+    """
+    distances = get_relative_distances(window_size)
+    sign = torch.sign(distances)
+    absolute_distances = torch.abs(distances)
+    return sign * torch.log2(1 + absolute_distances)
