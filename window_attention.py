@@ -11,11 +11,11 @@ class WindowAttention(nn.Module):
     """
     Window attention used in the Swin Transformer. Applies the following transformations to an
     input of shape (B, C, H, W) (transformations in order):
-        - apply cyclic shift (if neccessary)
+        - apply cyclic shift (if necessary)
         - find multi-headed dot product
         - apply normalization by scaling the dot product by the inverse square root of the head dimension
         - apply relative positional embeddings to the scaled dot product
-        - apply the attention mask (if neccessary)
+        - apply the attention mask (if necessary)
         - find the values of the multi-headed attention mechanism and concatenate
         - linearly project the values to the input dimension
     """
@@ -73,7 +73,7 @@ class WindowAttention(nn.Module):
         nw_h = h // self.window_size  # number of windows along the height
         nw_w = w // self.window_size  # number of windows along the width
 
-        # function which maps q, k, v into appropriate representations for dot-product attention
+        # reshape q, k, v into appropriate representations for cosine attention
         q, k, v = map(lambda t: rearrange(t, "b (nw_h w_h) (nw_w w_w) (heads d) -> b heads (nw_h nw_w) (w_h w_w) d",
                                           w_h=self.window_size, w_w=self.window_size, heads=self.heads,
                                           d=self.head_dim),
