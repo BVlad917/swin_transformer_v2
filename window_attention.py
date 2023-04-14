@@ -77,7 +77,7 @@ class WindowAttention(nn.Module):
         # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 WINDOW_SIZE^2)
         tau = torch.clamp(self.tau, min=0.01)  # tau always >= 0.01
         tau = rearrange(tau, "h -> 1 h 1 1 1")  # change shape to allow for broadcasting
-        dots = dots * tau  # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 WINDOW_SIZE^2)
+        dots = dots / tau  # (B HEADS NUM_WINDOWS^2 WINDOW_SIZE^2 WINDOW_SIZE^2)
 
         # add positional embeddings
         dots = dots + self.pos_embedding[self.relative_indices[:, :, 0], self.relative_indices[:, :, 1]]
