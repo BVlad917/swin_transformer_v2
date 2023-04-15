@@ -1,7 +1,7 @@
 from torch import nn
 
 from patch_merging import PatchMerging
-from swin_transformer_block import SwinTransformerBlock
+from swin_v1_transformer_block import SwinTransformerBlock
 
 
 class StageModule(nn.Module):

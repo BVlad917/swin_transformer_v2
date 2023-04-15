@@ -1,4 +1,4 @@
-from swin_transformer import SwinTransformer
+from swin_v1_transformer import SwinTransformer
 
 
 def swin_t(num_classes, hidden_dim=96, layers=(2, 2, 6, 2), heads=(3, 6, 12, 24), **kwargs):
