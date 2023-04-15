@@ -12,7 +12,7 @@ class SwinTransformer(nn.Module):
 
     def __init__(self, layers, hidden_dim, heads, num_classes, channels=3, downscaling_factors=(4, 2, 2, 2),
                  head_dim=32, window_size=7, drop_path_rate=0.1, attn_drop_prob=0., proj_drop_prob=0.,
-                 pos_emb_drop_prob=0.):
+                 patch_merge_drop_prob=0.):
         super().__init__()
         assert len(layers) == 4, "Swin Transformer has 4 stages by default"
         dpr = torch.linspace(0, drop_path_rate, sum(layers)).tolist()
@@ -27,7 +27,7 @@ class SwinTransformer(nn.Module):
                                   drop_path_probs=dpr[:sum(layers[:1])],
                                   attn_drop_prob=attn_drop_prob,
                                   proj_drop_prob=proj_drop_prob,
-                                  pos_emb_drop_prob=pos_emb_drop_prob)
+                                  patch_merge_drop_prob=patch_merge_drop_prob)
         self.stage2 = StageModule(num_layers=layers[1],
                                   in_channels=hidden_dim,
                                   downscaling_factor=downscaling_factors[1],
@@ -38,7 +38,7 @@ class SwinTransformer(nn.Module):
                                   drop_path_probs=dpr[sum(layers[:1]): sum(layers[:2])],
                                   attn_drop_prob=attn_drop_prob,
                                   proj_drop_prob=proj_drop_prob,
-                                  pos_emb_drop_prob=pos_emb_drop_prob)
+                                  patch_merge_drop_prob=patch_merge_drop_prob)
         self.stage3 = StageModule(num_layers=layers[2],
                                   in_channels=hidden_dim * 2,
                                   downscaling_factor=downscaling_factors[2],
@@ -49,7 +49,7 @@ class SwinTransformer(nn.Module):
                                   drop_path_probs=dpr[sum(layers[:2]): sum(layers[:3])],
                                   attn_drop_prob=attn_drop_prob,
                                   proj_drop_prob=proj_drop_prob,
-                                  pos_emb_drop_prob=pos_emb_drop_prob)
+                                  patch_merge_drop_prob=patch_merge_drop_prob)
         self.stage4 = StageModule(num_layers=layers[3],
                                   in_channels=hidden_dim * 4,
                                   downscaling_factor=downscaling_factors[3],
@@ -60,7 +60,7 @@ class SwinTransformer(nn.Module):
                                   drop_path_probs=dpr[sum(layers[:3]): sum(layers)],
                                   attn_drop_prob=attn_drop_prob,
                                   proj_drop_prob=proj_drop_prob,
-                                  pos_emb_drop_prob=pos_emb_drop_prob)
+                                  patch_merge_drop_prob=patch_merge_drop_prob)
 
         self.mlp_head = nn.Sequential(
             nn.LayerNorm(hidden_dim * 8),

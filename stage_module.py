@@ -12,7 +12,7 @@ class StageModule(nn.Module):
     """
 
     def __init__(self, num_layers, in_channels, downscaling_factor, hidden_dim, num_heads, head_dim, window_size,
-                 drop_path_probs, attn_drop_prob, proj_drop_prob, pos_emb_drop_prob):
+                 drop_path_probs, attn_drop_prob, proj_drop_prob, patch_merge_drop_prob):
         super().__init__()
         assert num_layers % 2 == 0, "Stage layers need to be divisible by 2 for regular and shifted blocks"
         if isinstance(drop_path_probs, list):
@@ -21,7 +21,7 @@ class StageModule(nn.Module):
         self.patch_merging = PatchMerging(in_channels=in_channels,
                                           out_channels=hidden_dim,
                                           downscaling_factor=downscaling_factor)
-        self.pos_emb_drop = nn.Dropout(pos_emb_drop_prob)
+        self.patch_merge_drop = nn.Dropout(patch_merge_drop_prob)
 
         self.layers = nn.ModuleList([])
         for idx in range(num_layers // 2):
@@ -52,7 +52,7 @@ class StageModule(nn.Module):
     def forward(self, x):
         # input shape: (B, C, H, W)
         x = self.patch_merging(x)  # (B, hidden_dim, H // downscaling_factor, W // downscaling_factor)
-        x = self.pos_emb_drop(x)  # (B, hidden_dim, H // downscaling_factor, W // downscaling_factor)
+        x = self.patch_merge_drop(x)  # (B, hidden_dim, H // downscaling_factor, W // downscaling_factor)
 
         for regular_block, shifted_block in self.layers:
             x = regular_block(x)  # (B, hidden_dim, H // downscaling_factor, W // downscaling_factor)
