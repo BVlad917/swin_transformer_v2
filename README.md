@@ -1,4 +1,4 @@
-# Swin Transformer
+# Swin Transformer V2
 
 Implementation of the [Swin Transformer V2](https://arxiv.org/abs/2111.09883).
 
